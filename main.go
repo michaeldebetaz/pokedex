@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"math/rand"
 	"os"
 	"strings"
 	"time"
@@ -12,9 +13,11 @@ import (
 )
 
 type config struct {
+	Inputs   []string
 	Next     string
 	Previous string
 	Cache    pokecache.Cache
+	Pokedex  map[string]pokeapi.Pokemon
 }
 
 type cliCommand struct {
@@ -36,18 +39,16 @@ func main() {
 
 		scanner.Scan()
 
-		inputs := cleanInput(scanner.Text())
+		config.Inputs = cleanInput(scanner.Text())
 
-		if len(inputs) < 1 {
-			continue
-		}
-
-		first := inputs[0]
-		cmd, ok := cmds[first]
-		if ok {
-			cmd.Callback()
-		} else {
-			fmt.Println("Command not found")
+		if len(config.Inputs) > 0 {
+			first := config.Inputs[0]
+			cmd, ok := cmds[first]
+			if ok {
+				cmd.Callback()
+			} else {
+				fmt.Println("Command not found")
+			}
 		}
 	}
 }
@@ -57,18 +58,70 @@ func cleanInput(s string) []string {
 }
 
 func createConfig() *config {
-	const INTERVAL = 5 * time.Second
-	const LIMIT = 20
-
 	return &config{
-		Next:     fmt.Sprintf("https://pokeapi.co/api/v2/location-area/?limit=%d", LIMIT),
+		Inputs:   []string{},
+		Next:     fmt.Sprintf("https://pokeapi.co/api/v2/location-area/"),
 		Previous: "",
-		Cache:    pokecache.NewCache(INTERVAL),
+		Cache:    pokecache.NewCache(5 * time.Second),
+		Pokedex:  make(map[string]pokeapi.Pokemon),
 	}
 }
 
 func createCommands(config *config) map[string]cliCommand {
 	cmds := make(map[string]cliCommand)
+
+	cmds["catch"] = cliCommand{
+		Name:        "catch",
+		Description: "Catch a Pokemon",
+		Callback: func() error {
+			if len(config.Inputs) < 2 {
+				fmt.Println("Please provide a Pokemon name")
+				return nil
+			}
+
+			pokemonName := config.Inputs[1]
+			fmt.Printf("Throwing a Pokeball at %s...\n", pokemonName)
+
+			url := "https://pokeapi.co/api/v2/pokemon/" + pokemonName + "/"
+			pokemon := pokeapi.GetPokemonData(url, config.Cache)
+
+			const BASE = 1000
+			n := rand.Intn(BASE)
+
+			if n > (BASE+pokemon.BaseExperience)/2 {
+				fmt.Printf("%s was caught!\n", pokemon.Name)
+				config.Pokedex[pokemon.Name] = pokemon
+			} else {
+				fmt.Printf("%s escaped!\n", pokemon.Name)
+			}
+
+			return nil
+		},
+	}
+
+	cmds["explore"] = cliCommand{
+		Name:        "explore",
+		Description: "Explore a specific location area",
+		Callback: func() error {
+			if len(config.Inputs) < 2 {
+				fmt.Println("Please provide a location area")
+				return nil
+			}
+
+			areaName := config.Inputs[1]
+			fmt.Printf("Exploring %s...\n", areaName)
+
+			url := "https://pokeapi.co/api/v2/location-area/" + areaName + "/"
+			data := pokeapi.GetLocationAreaData(url, config.Cache)
+
+			fmt.Println("Found Pokemon:")
+			for _, encounter := range data.PokemonEncounters {
+				fmt.Printf(" - %s\n", encounter.Pokemon.Name)
+			}
+
+			return nil
+		},
+	}
 
 	cmds["help"] = cliCommand{
 		Name:        "help",
@@ -95,7 +148,7 @@ func createCommands(config *config) map[string]cliCommand {
 				return nil
 			}
 
-			data := pokeapi.GetLocationAreasData(url, config.Cache)
+			data := pokeapi.GetLocationAreasPagination(url, config.Cache)
 			config.Next = data.Next
 			config.Previous = data.Previous
 
@@ -117,7 +170,7 @@ func createCommands(config *config) map[string]cliCommand {
 				return nil
 			}
 
-			data := pokeapi.GetLocationAreasData(url, config.Cache)
+			data := pokeapi.GetLocationAreasPagination(url, config.Cache)
 			config.Next = data.Next
 			config.Previous = data.Previous
 
