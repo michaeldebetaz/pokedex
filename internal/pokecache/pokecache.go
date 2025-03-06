@@ -28,7 +28,7 @@ func NewCache(interval time.Duration) Cache {
 	return cache
 }
 
-func (c *Cache) Add(key string, val []byte) ([]byte, bool) {
+func (c Cache) Add(key string, val []byte) ([]byte, bool) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
 

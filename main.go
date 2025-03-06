@@ -138,6 +138,42 @@ func createCommands(config *config) map[string]cliCommand {
 		},
 	}
 
+	cmds["inspect"] = cliCommand{
+		Name:        "inspect",
+		Description: "Inspect a Pokemon",
+		Callback: func() error {
+			if len(config.Inputs) < 2 {
+				fmt.Println("Please provide a Pokemon name")
+				return nil
+			}
+
+			pokemonName := config.Inputs[1]
+			fmt.Printf("Inspecting %s in the Pokedex...\n", pokemonName)
+
+			pokemon, ok := config.Pokedex[pokemonName]
+			if !ok {
+				fmt.Println("you have not caught that pokemon")
+				return nil
+			}
+
+			fmt.Printf("Name: %s\n", pokemon.Name)
+			fmt.Printf("Height: %d\n", pokemon.Height)
+			fmt.Printf("Weight: %d\n", pokemon.Weight)
+
+			fmt.Println("Stats:")
+			for _, stat := range pokemon.Stats {
+				fmt.Printf("  -%s: %d\n", stat.Stat.Name, stat.BaseStat)
+			}
+
+			fmt.Println("Types:")
+			for _, t := range pokemon.Types {
+				fmt.Printf("  - %s\n", t.Type.Name)
+			}
+
+			return nil
+		},
+	}
+
 	cmds["map"] = cliCommand{
 		Name:        "map",
 		Description: "",
@@ -176,6 +212,20 @@ func createCommands(config *config) map[string]cliCommand {
 
 			for _, area := range data.Results {
 				fmt.Printf("%s\n", area.Name)
+			}
+
+			return nil
+		},
+	}
+
+	cmds["pokedex"] = cliCommand{
+		Name:        "pokedex",
+		Description: "List all Pokemon in the Pokedex",
+		Callback: func() error {
+			fmt.Println("Your Pokedex:")
+
+			for name := range config.Pokedex {
+				fmt.Printf(" - %s\n", name)
 			}
 
 			return nil
